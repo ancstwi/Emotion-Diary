@@ -7,15 +7,23 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
 
-  console.log('📥 Получен запрос на регистрацию:', { email, first_name, last_name });
-  
-  // Валидация
+  console.log('📥 Получен запрос на регистрацию:', {
+    email,
+    first_name,
+    last_name,
+  });
+
   if (!first_name || !last_name || !email || !password) {
-    return res.status(400).json({ message: 'Все поля обязательны для заполнения' });
+    return res
+      .status(400)
+      .json({ message: 'Все поля обязательны для заполнения' });
   }
 
   try {
-    const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const existingUser = await db.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ message: 'Пользователь уже существует' });
     }
@@ -28,49 +36,53 @@ router.post('/register', async (req, res) => {
       [first_name, last_name, email, password_hash]
     );
 
-  const newUser = result.rows[0];
-  console.log('✅ Пользователь создан:', newUser.id, newUser.email, newUser.created_at);
+    const newUser = result.rows[0];
+    console.log(
+      'Пользователь создан:',
+      newUser.id,
+      newUser.email,
+      newUser.created_at
+    );
 
-// Создаем JWT токен для нового пользователя
-const token = jwt.sign(
-  { userId: newUser.id, email: newUser.email },
-  process.env.JWT_SECRET,
-  { expiresIn: '24h' }
-);
+    const token = jwt.sign(
+      { userId: newUser.id, email: newUser.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
 
-console.log('✅ Токен создан для пользователя:', newUser.id);
+    console.log('Токен создан для пользователя:', newUser.id);
 
-  res.status(201).json({ 
-  message: 'Пользователь зарегистрирован',
-  token: token,
-  user: {
-    id: newUser.id,
-    first_name: newUser.first_name,
-    last_name: newUser.last_name,
-    email: newUser.email,
-    created_at: newUser.created_at
-    }
-  });
+    res.status(201).json({
+      message: 'Пользователь зарегистрирован',
+      token: token,
+      user: {
+        id: newUser.id,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        email: newUser.email,
+        created_at: newUser.created_at,
+      },
+    });
   } catch (err) {
-    console.error('❌ Ошибка регистрации:', err);
+    console.error('Ошибка регистрации:', err);
     res.status(500).json({ message: 'Ошибка сервера при регистрации' });
   }
 });
 
-
-// Логин
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  
+
   console.log('📥 Получен запрос на вход:', { email });
-  
+
   if (!email || !password) {
-    console.log('❌ Email и пароль обязательны');
+    console.log('Email и пароль обязательны');
     return res.status(400).json({ message: 'Email и пароль обязательны' });
   }
 
   try {
-    const userResult = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const userResult = await db.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ]);
     if (userResult.rows.length === 0) {
       return res.status(400).json({ message: 'Неверный email или пароль' });
     }
@@ -83,24 +95,23 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Неверный email или пароль' });
     }
 
-    // Создаем JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-console.log('✅ Успешный вход, токен создан для:', user.id);
+    console.log('Успешный вход, токен создан для:', user.id);
 
-    res.json({ 
+    res.json({
       message: 'Вход выполнен успешно',
       token,
       user: {
         id: user.id,
         first_name: user.first_name,
         last_name: user.last_name,
-        email: user.email
-      }
+        email: user.email,
+      },
     });
   } catch (err) {
     console.error('Ошибка входа:', err);
