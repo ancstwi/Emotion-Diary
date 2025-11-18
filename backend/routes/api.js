@@ -1,75 +1,57 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:5000';
 
 async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('authToken');
 
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
+  const headers = {
+    'Content-Type': 'application/json',
   };
 
-  if (config.body && typeof config.body === 'object') {
-    config.body = JSON.stringify(config.body);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const config = {
+    headers: headers,
+    method: options.method || 'GET',
+  };
+
+  if (options.body) {
+    config.body =
+      typeof options.body === 'string'
+        ? options.body
+        : JSON.stringify(options.body);
   }
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, config);
-    const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Ошибка сервера');
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+      return;
     }
 
-    return data;
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
   } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+    return { error: error.message };
   }
 }
 
-export const authAPI = {
-  register: (userData) =>
-    apiRequest('/auth/register', {
-      method: 'POST',
-      body: userData,
-    }),
-
-  login: (credentials) =>
-    apiRequest('/auth/login', {
-      method: 'POST',
-      body: credentials,
-    }),
-};
-
 export const entriesAPI = {
-  getAll: () => apiRequest('/entries'),
+  getAll: () => apiRequest('/api/entries'),
 
-  getById: (id) => apiRequest(`/entries/${id}`),
+  getById: (id) => apiRequest(`/api/entry/${id}`),
 
   create: (entryData) =>
-    apiRequest('/entries', {
+    apiRequest('/api/entries', {
       method: 'POST',
       body: entryData,
     }),
 
   delete: (id) =>
-    apiRequest(`/entries/${id}`, {
+    apiRequest(`/api/entries/${id}`, {
       method: 'DELETE',
     }),
-};
-
-export const emotionsAPI = {
-  getList: () => apiRequest('/emotions-list'),
-
-  addToEntry: (emotionData) =>
-    apiRequest('/emotions', {
-      method: 'POST',
-      body: emotionData,
-    }),
-
-  getUserEmotions: () => apiRequest('/user-emotions'),
 };
