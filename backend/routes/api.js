@@ -1,57 +1,133 @@
-const API_BASE = 'http://localhost:5000';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-async function apiRequest(endpoint, options = {}) {
+const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('authToken');
-
-  const headers = {
+  const headers = new Headers({
     'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  });
 
   const config = {
-    headers: headers,
     method: options.method || 'GET',
+    headers,
+    credentials: 'include',
+    ...options,
   };
 
-  if (options.body) {
-    config.body =
-      typeof options.body === 'string'
-        ? options.body
-        : JSON.stringify(options.body);
+  if (options.body && typeof options.body === 'object') {
+    config.body = JSON.stringify(options.body);
   }
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, config);
 
-    if (response.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-      return;
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('authToken');
+        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+      }
+
+      const errorData = await response.json().catch(() => ({
+        message: `HTTP error ${response.status}: ${response.statusText}`,
+      }));
+
+      throw new Error(errorData.message || `Ошибка ${response.status}`);
     }
 
-    const text = await response.text();
-    return text ? JSON.parse(text) : {};
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    }
+
+    return await response.text();
   } catch (error) {
-    return { error: error.message };
+    console.error(`API Request Failed [${endpoint}]:`, error);
+
+    if (
+      error.name === 'TypeError' &&
+      error.message.includes('Failed to fetch')
+    ) {
+      throw new Error('Проблемы с подключением к серверу');
+    }
+
+    throw error;
   }
-}
+};
+
+const apiRequestWithRetry = async (endpoint, options = {}, retries = 2) => {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await apiRequest(endpoint, options);
+    } catch (error) {
+      if (i === retries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
+
+export const authAPI = {
+  register: (userData) =>
+    apiRequest('/auth/register', {
+      method: 'POST',
+      body: userData,
+    }),
+
+  login: (credentials) =>
+    apiRequest('/auth/login', {
+      method: 'POST',
+      body: credentials,
+    }),
+
+  logout: () => {
+    localStorage.removeItem('authToken');
+    return Promise.resolve();
+  },
+};
 
 export const entriesAPI = {
-  getAll: () => apiRequest('/api/entries'),
+  getAll: () => apiRequestWithRetry('/entries'),
 
-  getById: (id) => apiRequest(`/api/entry/${id}`),
+  getById: (id) => apiRequest(`/entries/${id}`),
 
   create: (entryData) =>
-    apiRequest('/api/entries', {
+    apiRequest('/entries', {
       method: 'POST',
       body: entryData,
     }),
 
+  update: (id, entryData) =>
+    apiRequest(`/entries/${id}`, {
+      method: 'PUT',
+      body: entryData,
+    }),
+
   delete: (id) =>
-    apiRequest(`/api/entries/${id}`, {
+    apiRequest(`/entries/${id}`, {
       method: 'DELETE',
     }),
+};
+
+export const emotionsAPI = {
+  getList: () => apiRequest('/emotions'),
+
+  addToEntry: (entryId, emotionData) =>
+    apiRequest(`/entries/${entryId}/emotions`, {
+      method: 'POST',
+      body: emotionData,
+    }),
+
+  removeFromEntry: (entryId, emotionId) =>
+    apiRequest(`/entries/${entryId}/emotions/${emotionId}`, {
+      method: 'DELETE',
+    }),
+
+  getUserEmotions: (period = 'week') =>
+    apiRequest(`/user/emotions?period=${period}`),
+};
+
+export const apiUtils = {
+  setToken: (token) => localStorage.setItem('authToken', token),
+  getToken: () => localStorage.getItem('authToken'),
+  clearToken: () => localStorage.removeItem('authToken'),
 };
