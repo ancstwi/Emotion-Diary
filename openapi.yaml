@@ -1,0 +1,342 @@
+openapi: 3.0.0
+info:
+  title: Emotion Diary API
+  version: 1.0.0
+  description: REST API для приложения дневника эмоций. Тестирование через Postman.
+
+servers:
+  - url: http://localhost:5001
+    description: Local
+
+paths:
+  /api/health:
+    get:
+      summary: Проверка работоспособности
+      tags: [System]
+      responses:
+        200:
+          description: OK
+
+  /api/auth/register:
+    post:
+      summary: Регистрация пользователя
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, email, password]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                email: { type: string }
+                password: { type: string }
+      responses:
+        201:
+          description: Пользователь создан
+        400:
+          description: Ошибка валидации
+
+  /api/auth/login:
+    post:
+      summary: Вход
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        200:
+          description: Успешный вход, возвращает token
+        400:
+          description: Неверные данные
+
+  /api/entries:
+    get:
+      summary: Получить все записи
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: JSON Array[Entry]
+    post:
+      summary: Создать запись
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [situation, thoughts, body_reaction, behavior_reaction]
+              properties:
+                situation: { type: string }
+                thoughts: { type: string }
+                created_at:
+                  type: string
+                  format: date-time
+                  description: Дата/время записи (опционально)
+                body_reaction: { type: string }
+                behavior_reaction: { type: string }
+      responses:
+        201:
+          description: Создано
+          headers:
+            Location:
+              description: URI созданного ресурса
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  version: { type: integer, description: Начальная версия записи (оптимистичная блокировка) }
+        400:
+          description: Ошибка валидации
+
+  /api/entries/{id}:
+    get:
+      summary: Получить запись по ID
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: JSON Entry (поле version — для PUT/PATCH/DELETE)
+        404:
+          description: Не найдена
+    put:
+      summary: Обновить запись (CRUD)
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [situation, thoughts, body_reaction, behavior_reaction, version]
+              properties:
+                situation: { type: string }
+                thoughts: { type: string }
+                created_at:
+                  type: string
+                  format: date-time
+                  description: Новая дата/время записи (опционально)
+                body_reaction: { type: string }
+                behavior_reaction: { type: string }
+                version:
+                  type: integer
+                  minimum: 1
+                  description: Ожидаемая версия с GET; при успехе version увеличивается на сервере
+                emotions:
+                  type: array
+                  items:
+                    type: object
+                    required: [emotion_id, intensity]
+                    properties:
+                      emotion_id: { type: integer }
+                      intensity: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        200:
+          description: Обновлено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+        404:
+          description: Не найдена
+        409:
+          description: Несовпадение version (запись изменена)
+    patch:
+      summary: Частично обновить запись
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  description: Ожидаемая версия с GET
+                situation: { type: string }
+                thoughts: { type: string }
+                body_reaction: { type: string }
+                behavior_reaction: { type: string }
+                created_at:
+                  type: string
+                  format: date-time
+                  description: Новая дата (опционально; пустая строка — не менять)
+                emotions:
+                  type: array
+                  description: Если передан — полная замена списка эмоций у записи
+                  items:
+                    type: object
+                    required: [emotion_id, intensity]
+                    properties:
+                      emotion_id: { type: integer }
+                      intensity: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        200:
+          description: Обновлено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+        400:
+          description: Нет полей для обновления или невалидные данные
+        404:
+          description: Не найдена
+        409:
+          description: Несовпадение version
+    delete:
+      summary: Удалить запись
+      tags: [Entries]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+      responses:
+        200:
+          description: Удалено, empty body
+        404:
+          description: Не найдена
+        409:
+          description: Несовпадение version
+
+  /api/emotions-list:
+    get:
+      summary: Список эмоций (справочник)
+      tags: [Emotions]
+      responses:
+        200:
+          description: JSON Array[Emotion]
+
+  /api/emotions:
+    post:
+      summary: Добавить эмоцию к записи
+      tags: [Emotions]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entry_id, emotion_id, intensity]
+              properties:
+                entry_id: { type: integer }
+                emotion_id: { type: integer }
+                intensity: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        201:
+          description: Создано, empty body
+          headers:
+            Location:
+              description: URI созданного ресурса
+              schema:
+                type: string
+        400:
+          description: Ошибка валидации
+
+  /api/entries/{entryId}/emotions/{emotionId}:
+    delete:
+      summary: Убрать эмоцию с записи
+      tags: [Emotions]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: entryId
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: emotionId
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Удалено, empty body
+        404:
+          description: Запись или связь не найдена
+
+  /api/stats:
+    get:
+      summary: Статистика (пример асинхронности — Promise.all)
+      tags: [System]
+      responses:
+        200:
+          description: emotions, entries, users count
+
+  /api/user-emotions:
+    get:
+      summary: Эмоции пользователя
+      tags: [Emotions]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: JSON Array[UserEmotion]
+
+  /api/insights/analyze:
+    post:
+      summary: ИИ-анализ эмоциональных паттернов и мягкий прогноз (GigaChat)
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: analysis — текст на русском
+        400:
+          description: Нет записей в дневнике
+        503:
+          description: Не настроены GIGACHAT_* в .env
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
