@@ -1,8 +1,41 @@
-# React + Vite
+# Emotion Diary
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Emotion Diary is an app for keeping emotional journal entries with analytics.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Web: React + Vite
+- Backend: Node.js + Express + PostgreSQL
+- Mobile: Expo (React Native)
+- Messaging: Kafka
+- APIs: REST + gRPC
+
+## Quick start
+
+### 1) Infrastructure
+
+```bash
+docker compose up -d
+```
+
+### 2) Backend
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+### 3) Web frontend
+
+```bash
+npm install
+npm run dev
+```
+
+## Default local endpoints
+
+- REST API: `http://localhost:5001/api`
+- gRPC: `localhost:50051`
+- Web app: `http://localhost:5173`

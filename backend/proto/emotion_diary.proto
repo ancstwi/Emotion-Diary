@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package emotiondiary;
+
+service EmotionDiary {
+  rpc GetEmotionsCount (Empty) returns (EmotionsCountResponse);
+  rpc GetEmotionsList (Empty) returns (EmotionsListResponse);
+  rpc GetEntriesCount (GetEntriesCountRequest) returns (EntriesCountResponse);
+  rpc GetEntry (GetEntryRequest) returns (DiaryEntryResponse);
+}
+
+message Empty {}
+
+message EmotionsCountResponse {
+  int32 count = 1;
+}
+
+message Emotion {
+  int32 id = 1;
+  string name = 2;
+}
+
+message EmotionsListResponse {
+  repeated Emotion emotions = 1;
+}
+
+message GetEntriesCountRequest {
+  int32 user_id = 1;
+}
+
+message EntriesCountResponse {
+  int32 count = 1;
+}
+
+message GetEntryRequest {
+  int32 user_id = 1;
+  int32 entry_id = 2;
+}
+
+message EntryEmotion {
+  int32 id = 1;
+  string name = 2;
+  int32 intensity = 3;
+}
+
+message DiaryEntryResponse {
+  int32 id = 1;
+  int32 user_id = 2;
+  string situation = 3;
+  string thoughts = 4;
+  string body_reaction = 5;
+  string behavior_reaction = 6;
+  string created_at = 7;
+  int32 version = 8;
+  repeated EntryEmotion emotions = 9;
+}
